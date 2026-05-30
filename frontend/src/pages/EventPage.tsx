@@ -49,6 +49,9 @@ export default function EventPage() {
         )}
       </div>
 
+      {/* Fee-Bump sponsorship banner */}
+      {ev.fee_bump && <FeeSponsorBanner feeBump={ev.fee_bump} />}
+
       {/* Issue #40 — Resource Consumption breakdown */}
       <ResourceCosts event={ev} />
 

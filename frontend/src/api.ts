@@ -13,6 +13,13 @@ export interface StorageTiers {
   temporary: StorageWrite[];
 }
 
+export interface FeeBumpInfo {
+  /** Outer fee-paying account (the sponsor). */
+  sponsor: string;
+  /** Inner transaction source account (the original caller). */
+  inner_source: string;
+}
+
 export interface DecodedEvent {
   seq: number;
   contract_id: string;
