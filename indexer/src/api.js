@@ -10,6 +10,10 @@ import { getMetrics } from "./rpcMetrics.js";
 import { getRpcNodeStatus } from "./rpcMultiNode.js";
 import { cacheAside, cacheDel } from "./metadataCache.js";  // Issue #137
 import { attachGraphQL } from "./graphql.js";               // Issue #139
+import { parseExecutionTrace } from "./executionTraceParser.js";     // Issue #174
+import { detectReentrancyFromParsed } from "./reentrancyTrapDetector.js"; // Issue #175
+import { parseDiagnosticEvents } from "./diagnosticParser.js";       // Issue #175
+import { annotateEvictionStates, summariseEvictionStats } from "./storageEvictionTracker.js"; // Issue #176
 
 const PORT = process.env.PORT || 3001;
 const VERIFY_ON_UPLOAD = process.env.VERIFY_ABI !== "false";
