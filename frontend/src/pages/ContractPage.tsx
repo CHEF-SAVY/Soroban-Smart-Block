@@ -53,7 +53,7 @@ const DEMO_TREE: InvocationNode = {
   ],
 };
 
-type Tab = "overview" | "source" | "simulate" | "flow" | "roles" | "networks" | "graph";
+type Tab = "overview" | "source" | "simulate" | "flow" | "roles" | "networks" | "graph" | "state-diff";
 
 export default function ContractPage() {
   const { id = "" } = useParams();
@@ -143,13 +143,14 @@ export default function ContractPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "overview",  label: "Overview" },
-    { key: "source",    label: "Source Code" },
-    { key: "simulate",  label: "Simulate" },
-    { key: "flow",      label: "Invocation Flow" },
-    { key: "roles",     label: "Privileged Roles" },
-    { key: "networks",  label: "Networks" },
-    { key: "graph",     label: "Address Graph" },
+    { key: "overview",    label: "Overview" },
+    { key: "source",      label: "Source Code" },
+    { key: "simulate",    label: "Simulate" },
+    { key: "flow",        label: "Invocation Flow" },
+    { key: "roles",       label: "Privileged Roles" },
+    { key: "networks",    label: "Networks" },
+    { key: "graph",       label: "Address Graph" },
+    { key: "state-diff",  label: "State Timeline" },
   ];
 
   return (
@@ -388,14 +389,21 @@ export default function ContractPage() {
         </>
       )}
 
-      {/* Tab: Source Code — Issues #45, #85 */}
+      {/* Tab: Source Code — Issues #45, #85, #135 */}
       {tab === "source" && (
-        meta.source_files && meta.source_files.length > 0
-          ? <SourceFileTree files={meta.source_files} />
-          : <RustCodeViewer
-              source={meta.source ?? DEMO_SOURCE}
-              filename={meta.source_file ?? `${id.slice(0, 8)}.rs`}
-            />
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <SourceVerificationBadge
+            contractId={id}
+            wasmHash={(meta as any).wasm_hash ?? undefined}
+          />
+          {meta.source_files && meta.source_files.length > 0
+            ? <SourceFileTree files={meta.source_files} />
+            : <RustCodeViewer
+                source={meta.source ?? DEMO_SOURCE}
+                filename={meta.source_file ?? `${id.slice(0, 8)}.rs`}
+              />
+          }
+        </div>
       )}
 
       {/* Tab: Simulate — Issue #46 */}
@@ -436,6 +444,9 @@ export default function ContractPage() {
 
       {/* Tab: Address Connection Graph — Issue #126 */}
       {tab === "graph" && <AddressConnectionGraph contractId={id} />}
+
+      {/* Tab: State-Diff Timeline — Issue #140 */}
+      {tab === "state-diff" && <StateDiffTimeline contractId={id} />}
     </div>
   );
 }
