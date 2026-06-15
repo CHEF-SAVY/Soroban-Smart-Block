@@ -207,10 +207,10 @@ The decoder recognises SEP-41 token events (`transfer`, `mint`, `burn`) and form
 
 | Document | Description |
 |----------|-------------|
-| [ROADMAP.md](ROADMAP.md) | 3-tranche milestone plan (MVP → Testnet → Mainnet) |
-| [BUDGET.md](BUDGET.md) | Engineering hours and cost breakdown per tranche |
-| [TEAM.md](TEAM.md) | Team bios and qualification evidence |
-| [MANIFEST.md](MANIFEST.md) | Full project manifest |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 3-tranche milestone plan (MVP → Testnet → Mainnet) |
+| [docs/BUDGET.md](docs/BUDGET.md) | Engineering hours and cost breakdown per tranche |
+| [docs/TEAM.md](docs/TEAM.md) | Team bios and qualification evidence |
+| [docs/MANIFEST.md](docs/MANIFEST.md) | Full project manifest |
 | [stellar.toml](stellar.toml) | SEP-1 compliant network info |
 
 ---
