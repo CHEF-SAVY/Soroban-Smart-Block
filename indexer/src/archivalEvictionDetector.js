@@ -10,62 +10,11 @@
  * its liveUntilLedger < currentLedger).
  */
 
-import { xdr, StrKey, scValToNative } from "@stellar/stellar-sdk";
+import { StrKey, scValToNative } from "@stellar/stellar-sdk";
 
 /**
  * Classify a removed LedgerEntry into a structured descriptor.
  *
- * @param {xdr.LedgerEntry} entry
- * @returns {{ key_type: string, key_label: string, contract_id?: string, wasm_hash?: string, data_key?: string, durability?: string } | null}
- */
-function classifyRemovedEntry(entry) {
-  try {
-    const data = entry.data();
-    const kind = data.switch().name;
-
-    if (kind === "contractData") {
-      const cd = data.contractData();
-      const durability = cd.durability().name === "persistent" ? "persistent" : "temporary";
-      const contractId = StrKey.encodeContract(cd.contract().contractId());
-      const keyVal = cd.key();
-      const isInstance = keyVal.switch().name === "scvLedgerKeyContractInstance";
-
-      if (isInstance) {
-        return {
-          key_type: "contractInstance",
-          key_label: `Contract instance (${contractId.slice(0, 8)}…)`,
-          contract_id: contractId,
-          durability,
-        };
-      }
-
-      let data_key;
-      try { data_key = String(scValToNative(keyVal)); } catch { data_key = keyVal.switch().name; }
-      return {
-        key_type: "contractData",
-        key_label: `Contract data key "${data_key}" (${contractId.slice(0, 8)}…)`,
-        contract_id: contractId,
-        data_key,
-        durability,
-      };
-    }
-
-    if (kind === "contractCode") {
-      const wasm_hash = Buffer.from(data.contractCode().hash()).toString("hex");
-      return {
-        key_type: "contractCode",
-        key_label: `Contract WASM code (${wasm_hash.slice(0, 12)}…)`,
-        wasm_hash,
-      };
-    }
-
-    // account / trustline entries are not subject to Soroban TTL eviction
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Detect evicted ledger keys from a raw Soroban RPC event's txMeta.
  *
@@ -105,10 +54,12 @@ export function detectEvictions(ev, ledger, txHash) {
 
         if (kind === "contractData") {
           const cd = key.contractData();
-          const durability = cd.durability().name === "persistent" ? "persistent" : "temporary";
+          const durability =
+            cd.durability().name === "persistent" ? "persistent" : "temporary";
           const contract_id = StrKey.encodeContract(cd.contract().contractId());
           const keyVal = cd.key();
-          const isInstance = keyVal.switch().name === "scvLedgerKeyContractInstance";
+          const isInstance =
+            keyVal.switch().name === "scvLedgerKeyContractInstance";
 
           let key_type, key_label, data_key;
           if (isInstance) {
@@ -116,13 +67,27 @@ export function detectEvictions(ev, ledger, txHash) {
             key_label = `Contract instance (${contract_id.slice(0, 8)}…)`;
           } else {
             key_type = "contractData";
-            try { data_key = String(scValToNative(keyVal)); } catch { data_key = keyVal.switch().name; }
+            try {
+              data_key = String(scValToNative(keyVal));
+            } catch {
+              data_key = keyVal.switch().name;
+            }
             key_label = `Contract data key "${data_key}" (${contract_id.slice(0, 8)}…)`;
           }
 
-          evictions.push({ contract_id, ledger, tx_hash: txHash, key_type, key_label, durability, data_key });
+          evictions.push({
+            contract_id,
+            ledger,
+            tx_hash: txHash,
+            key_type,
+            key_label,
+            durability,
+            data_key,
+          });
         } else if (kind === "contractCode") {
-          const wasm_hash = Buffer.from(key.contractCode().hash()).toString("hex");
+          const wasm_hash = Buffer.from(key.contractCode().hash()).toString(
+            "hex",
+          );
           evictions.push({
             contract_id: undefined,
             ledger,
@@ -132,9 +97,13 @@ export function detectEvictions(ev, ledger, txHash) {
             wasm_hash,
           });
         }
-      } catch { /* skip malformed change */ }
+      } catch {
+        /* skip malformed change */
+      }
     }
-  } catch { /* ignore missing txMeta */ }
+  } catch {
+    /* ignore missing txMeta */
+  }
 
   return evictions;
 }

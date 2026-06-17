@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "soroban-explorer-frontend",
   "version": "0.1.0",
   "private": true,
@@ -6,8 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-"test": "vitest run",
-"test:watch": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@stellar/freighter-api": "4.1.0",
@@ -15,6 +16,9 @@
     "@tanstack/react-query": "5.40.0",
     "3d-force-graph": "1.73.4",
     "cytoscape": "3.30.2",
+    "jszip": "3.10.1",
+    "monaco-editor": "0.50.0",
+    "@webcontainer/api": "^1.2.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "^6.30.0"
@@ -29,7 +33,7 @@
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "@vitejs/plugin-react": "^4.5.0",
-    "eslint": "^10.5.0",
+    "eslint": "^9.0.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.3.0",
     "typescript": "5.4.5",

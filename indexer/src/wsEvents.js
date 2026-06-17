@@ -21,11 +21,11 @@ export function publish(event) {
 
 export function publishVaultRatio(snapshot) {
   bus.emit("vault_ratio", {
-    contract_id:  snapshot.contract_id,
-    ratio:        snapshot.ratio,
+    contract_id: snapshot.contract_id,
+    ratio: snapshot.ratio,
     total_assets: snapshot.total_assets,
     total_supply: snapshot.total_supply,
-    ledger:       snapshot.ledger,
+    ledger: snapshot.ledger,
   });
 }
 
@@ -33,18 +33,12 @@ export function publishContractLink(link) {
   bus.emit("contract_link", link);
 }
 
-function isOriginAllowed(origin) {
-  if (!origin) return false;
-  const allowed = process.env.CORS_ORIGIN || "*";
-  if (allowed === "*") return true;
-  return allowed.split(",").some(a => a.trim() === origin);
-}
-
 export function attachWebSocketServer(httpServer) {
   const wss = new WebSocketServer({
     server: httpServer,
     verifyClient: (info, cb) => {
-      const params = new url.URL(info.req.url || "", "http://localhost").searchParams;
+      const params = new url.URL(info.req.url || "", "http://localhost")
+        .searchParams;
       const key = params.get("api_key");
       if (API_KEY && key !== API_KEY) {
         cb(false, 401, "Unauthorized");
@@ -54,7 +48,7 @@ export function attachWebSocketServer(httpServer) {
     },
   });
 
-  wss.on("connection", (ws, req) => {
+  wss.on("connection", (ws, _req) => {
     console.log("[ws] Client connected");
 
     const handler = (event) => {
@@ -93,7 +87,12 @@ export function attachWebSocketServer(httpServer) {
       bus.off("contract_link", linkHandler);
     });
 
-    ws.send(JSON.stringify({ type: "connected", message: "Soroban event stream ready" }));
+    ws.send(
+      JSON.stringify({
+        type: "connected",
+        message: "Soroban event stream ready",
+      }),
+    );
   });
 
   console.log("[ws] WebSocket server attached");

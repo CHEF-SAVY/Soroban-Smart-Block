@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { SorobanRpc } from "@stellar/stellar-sdk";
 import { startApi } from "./api.js";
 import { db } from "./db.js";
@@ -24,67 +23,17 @@ import { processCircuitBreakerEvent } from "./circuitBreakerIndexer.js";
 import { startGasGuzzlersWorker } from "./gasGuzzlers.js";
 import { recordLedgerHash } from "./reorgWorker.js";
 
-const RPC_URL      = process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+const RPC_URL =
+  process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
 const START_LEDGER = Number(process.env.START_LEDGER || 0);
-const POLL_MS      = Number(process.env.POLL_MS || 5000);
+const POLL_MS = Number(process.env.POLL_MS || 5000);
 // Max events per RPC page — Soroban caps at 200
-const PAGE_LIMIT   = 200;
-
-/**
- * Extract the raw token amount from a decoded event's raw_data string.
- * Handles two storage formats:
- *   - plain value:   "15000000"  (i128 serialised as number/string)
- *   - wrapped object: {"amount":"15000000"}  (used by some SEP-41 contracts)
- * Returns null when no parseable amount is found.
- */
-function parseRawAmount(raw_data) {
-  if (!raw_data) return null;
-  try {
-    const val = JSON.parse(raw_data);
-    if (val !== null && typeof val === "object" && !Array.isArray(val) && "amount" in val) {
-      return String(val.amount);
-    }
-    if (typeof val === "number" && Number.isFinite(val)) return String(Math.trunc(val));
-    if (typeof val === "string" && /^-?\d+$/.test(val)) return val;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Update token_holders balances for SEP-41 transfer / mint / burn events.
- * Non-blocking: errors are logged but never interrupt the indexer loop.
- */
-async function applyHolderBalance(decoded) {
-  const { function: fn, contract_id, raw_topics, raw_data } = decoded;
-  const amount = parseRawAmount(raw_data);
-  if (!amount || amount === "0") return;
-
-  if (fn === "transfer") {
-    const from = raw_topics[1];
-    const to   = raw_topics[2];
-    if (from && to) await db.applyTransfer(contract_id, from, to, amount);
-  } else if (fn === "mint") {
-    // SEP-41 mint topics: [symbol, admin, to]
-    const to = raw_topics[2];
-    if (to) await db.applyMint(contract_id, to, amount);
-  } else if (fn === "burn") {
-    // SEP-41 burn topics: [symbol, from]
-    const from = raw_topics[1];
-    if (from) await db.applyBurn(contract_id, from, amount);
-  }
-}
+const PAGE_LIMIT = 200;
 
 const rpc = new SorobanRpc.Server(RPC_URL, { allowHttp: true });
 
 // ── Issue #33: persisted ledger cursor ────────────────────────────────────────
 // The cursor is stored in the DB so the daemon resumes correctly after restart.
-// cursorRef is shared with the reorg worker so it can rewind on fork.
-const cursorRef = {
-  getCursor: () => _cursor,
-  setCursor: (n) => { _cursor = n; },
-};
 let _cursor = 0;
 
 /**
@@ -102,8 +51,14 @@ async function indexWasmUploads(txHashes, ledger) {
       if (!tx?.envelopeXdr) continue;
 
       const { xdr } = await import("@stellar/stellar-sdk");
-      const envelope = xdr.TransactionEnvelope.fromXDR(tx.envelopeXdr, "base64");
-      const ops = envelope.tx?.().operations?.() ?? envelope.v1?.().tx?.().operations?.() ?? [];
+      const envelope = xdr.TransactionEnvelope.fromXDR(
+        tx.envelopeXdr,
+        "base64",
+      );
+      const ops =
+        envelope.tx?.().operations?.() ??
+        envelope.v1?.().tx?.().operations?.() ??
+        [];
 
       for (const op of ops) {
         const body = op.body();
@@ -114,7 +69,9 @@ async function indexWasmUploads(txHashes, ledger) {
         const wasmBytes = hf.wasm();
         const meta = extractBuildMetadata(wasmBytes);
         await db.upsertWasmBuildMetadata({ ...meta, ledger, tx_hash: txHash });
-        console.log(`[${ledger}] WASM upload indexed: ${meta.wasm_hash.slice(0, 16)}… compiler=${meta.compiler ?? "unknown"}`);
+        console.log(
+          `[${ledger}] WASM upload indexed: ${meta.wasm_hash.slice(0, 16)}… compiler=${meta.compiler ?? "unknown"}`,
+        );
       }
     } catch (err) {
       // Non-fatal: log and continue
@@ -151,18 +108,27 @@ async function indexLedger(ledger) {
     // getTransaction calls when multiple events share the same transaction.
     const feeBumpCache = new Map();
     const restoreCache = new Map(); // Issue #167: txHash → archival_info
-    const uniqueTxHashes = [...new Set(res.events.map(e => e.txHash).filter(Boolean))];
-    await Promise.all(uniqueTxHashes.map(async (txHash) => {
-      try {
-        const txResult = await withRetry(() => rpc.getTransaction(txHash));
-        if (txResult?.envelopeXdr) {
-          feeBumpCache.set(txHash, parseFeeBump(txResult.envelopeXdr));
-          // Issue #167: parse RestoreFootprintOp if present
-          const restore = parseAndDescribeRestore(txResult.envelopeXdr, txResult.resultMetaXdr ?? null);
-          if (restore.isRestoreOp) restoreCache.set(txHash, restore);
+    const uniqueTxHashes = [
+      ...new Set(res.events.map((e) => e.txHash).filter(Boolean)),
+    ];
+    await Promise.all(
+      uniqueTxHashes.map(async (txHash) => {
+        try {
+          const txResult = await withRetry(() => rpc.getTransaction(txHash));
+          if (txResult?.envelopeXdr) {
+            feeBumpCache.set(txHash, parseFeeBump(txResult.envelopeXdr));
+            // Issue #167: parse RestoreFootprintOp if present
+            const restore = parseAndDescribeRestore(
+              txResult.envelopeXdr,
+              txResult.resultMetaXdr ?? null,
+            );
+            if (restore.isRestoreOp) restoreCache.set(txHash, restore);
+          }
+        } catch {
+          /* non-critical — skip fee-bump/restore for this tx */
         }
-      } catch { /* non-critical — skip fee-bump/restore for this tx */ }
-    }));
+      }),
+    );
 
     for (const ev of res.events) {
       const decoded = await decode(ev);
@@ -171,7 +137,9 @@ async function indexLedger(ledger) {
 
       const upgrade = detectUpgrade(ev);
       if (upgrade) {
-        console.log(`[${ev.ledger}] CONTRACT UPGRADE ${ev.contractId}: ${upgrade.oldHash} → ${upgrade.newHash}`);
+        console.log(
+          `[${ev.ledger}] CONTRACT UPGRADE ${ev.contractId}: ${upgrade.oldHash} → ${upgrade.newHash}`,
+        );
         decoded.upgrade = upgrade;
       }
 
@@ -188,34 +156,40 @@ async function indexLedger(ledger) {
       // Issue #167: detect evicted ledger keys (TTL → 0) in this transaction
       const evictions = detectEvictions(ev, ev.ledger, ev.txHash);
       if (evictions.length) {
-        await db.insertArchivalEvictions(evictions).catch(err =>
-          console.error("[archivalEviction] insert failed:", err.message)
+        await db
+          .insertArchivalEvictions(evictions)
+          .catch((err) =>
+            console.error("[archivalEviction] insert failed:", err.message),
+          );
+        console.log(
+          `[${ev.ledger}] EVICTED ${evictions.length} key(s) in tx ${ev.txHash}`,
         );
-        console.log(`[${ev.ledger}] EVICTED ${evictions.length} key(s) in tx ${ev.txHash}`);
       }
 
-      publish(decoded);           // Issue #39 — push to WS clients
-      handleVaultEvent(decoded);  // vault ratio update (async, non-blocking)
-      
+      publish(decoded); // Issue #39 — push to WS clients
+      handleVaultEvent(decoded); // vault ratio update (async, non-blocking)
+
       // Issue #86: Process circuit breaker events
       const meta = await db.getContractMeta(ev.contractId).catch(() => null);
       if (meta) {
-        processCircuitBreakerEvent(decoded, meta).catch(err => 
-          console.error('[circuitBreakerIndexer] Error:', err.message)
+        processCircuitBreakerEvent(decoded, meta).catch((err) =>
+          console.error("[circuitBreakerIndexer] Error:", err.message),
         );
       }
-      
+
       console.log(`[${ev.ledger}] ${decoded.function}: ${decoded.description}`);
     }
 
     // Scan transactions for UploadContractWasm operations (non-blocking)
-    indexWasmUploads(uniqueTxHashes, ledger).catch(err =>
-      console.error("[wasmUpload] batch error:", err.message)
+    indexWasmUploads(uniqueTxHashes, ledger).catch((err) =>
+      console.error("[wasmUpload] batch error:", err.message),
     );
 
     // Issue #37 — record the latest ledger hash for re-org detection
     if (res.latestLedger && res.latestLedgerHash) {
-      await recordLedgerHash(res.latestLedger, res.latestLedgerHash).catch(() => {});
+      await recordLedgerHash(res.latestLedger, res.latestLedgerHash).catch(
+        () => {},
+      );
     }
 
     // If the RPC returned a full page there may be more events; follow the cursor.
@@ -232,8 +206,8 @@ async function run() {
   const server = startApi();
   startAbiSync();
   startBurnDetector();
-  startMetricsCollector();  // Issue #115 — RPC latency probes
-  startPruner();            // Issue #116 — daily temporary-storage cleanup
+  startMetricsCollector(); // Issue #115 — RPC latency probes
+  startPruner(); // Issue #116 — daily temporary-storage cleanup
   startGasGuzzlersWorker(); // Issue #133 — daily gas consumption leaderboard
 
   // Bootstrap vault indexer: initial ratio snapshot for all registered vaults
@@ -244,9 +218,11 @@ async function run() {
   // Issue #33: resume from the highest indexed ledger so no events are missed
   // after a restart. Fall back to START_LEDGER or (latest - 100) for first run.
   const dbMax = await db.getMaxLedger();
-  _cursor = dbMax > 0
-    ? dbMax + 1
-    : START_LEDGER || (await withRetry(() => multiNodeRpc.getLatestLedger())).sequence - 100;
+  _cursor =
+    dbMax > 0
+      ? dbMax + 1
+      : START_LEDGER ||
+        (await withRetry(() => multiNodeRpc.getLatestLedger())).sequence - 100;
 
   console.log(`[daemon] starting from ledger ${_cursor}`);
 
@@ -258,7 +234,7 @@ async function run() {
     } catch (err) {
       console.error("[daemon] indexer error:", err.message);
     }
-    if (!shutdown) await new Promise(r => setTimeout(r, POLL_MS));
+    if (!shutdown) await new Promise((r) => setTimeout(r, POLL_MS));
   }
 
   console.log("[daemon] shutting down");
@@ -266,7 +242,13 @@ async function run() {
   process.exit(0);
 }
 
-process.on("SIGTERM", () => { shutdown = true; console.log("[daemon] SIGTERM received"); });
-process.on("SIGINT", () => { shutdown = true; console.log("[daemon] SIGINT received"); });
+process.on("SIGTERM", () => {
+  shutdown = true;
+  console.log("[daemon] SIGTERM received");
+});
+process.on("SIGINT", () => {
+  shutdown = true;
+  console.log("[daemon] SIGINT received");
+});
 
 run();

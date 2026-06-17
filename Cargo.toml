@@ -3,4 +3,6 @@ resolver = "2"
 members  = ["contracts/explorer"]
 
 [workspace.dependencies]
-soroban-sdk = { version = "21.0.0" }
+soroban-sdk = { version = "25.0.2" }
+soroban-env-host = { version = "26.0.0" }
+stellar-xdr = { version = "25.0.1" }

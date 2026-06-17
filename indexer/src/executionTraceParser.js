@@ -8,11 +8,6 @@
 
 import { xdr, StrKey, scValToNative } from "@stellar/stellar-sdk";
 
-const HOST_FN_EVENTS = new Set([
-  "fn_call", "fn_return", "invoke_contract", "auth_check",
-  "host_fn", "wasm_trap", "call", "return",
-]);
-
 /**
  * Decode a single DiagnosticEvent XDR to a trace node shape.
  *
@@ -31,18 +26,24 @@ function decodeTraceEvent(b64, seq) {
     const rawId = ev.contractId();
     const contractId = rawId ? StrKey.encodeContract(rawId) : null;
 
-    const topicStrings = topics.map(t => {
-      try { return String(scValToNative(t)); } catch { return t.switch().name; }
+    const topicStrings = topics.map((t) => {
+      try {
+        return String(scValToNative(t));
+      } catch {
+        return t.switch().name;
+      }
     });
 
     let data = null;
     try {
       const n = scValToNative(dataVal);
       data = typeof n === "bigint" ? n.toString() : n;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     const eventType = topicStrings[0] ?? "unknown";
-    const fnName    = topicStrings[1] ?? null;
+    const fnName = topicStrings[1] ?? null;
 
     // Extract CPU instructions from data if present (map/struct shape)
     let cpuInstructions = null;
@@ -52,11 +53,18 @@ function decodeTraceEvent(b64, seq) {
     }
 
     let kind = "event";
-    if (eventType === "fn_call" || eventType === "call" || eventType === "invoke_contract") kind = "call";
-    else if (eventType === "fn_return" || eventType === "return") kind = "return";
+    if (
+      eventType === "fn_call" ||
+      eventType === "call" ||
+      eventType === "invoke_contract"
+    )
+      kind = "call";
+    else if (eventType === "fn_return" || eventType === "return")
+      kind = "return";
     else if (eventType === "auth_check") kind = "auth";
     else if (eventType === "wasm_trap" || eventType === "error") kind = "trap";
-    else if (topicStrings.some(s => /trap|panic|abort/i.test(s))) kind = "trap";
+    else if (topicStrings.some((s) => /trap|panic|abort/i.test(s)))
+      kind = "trap";
 
     return {
       seq,
@@ -148,7 +156,12 @@ function buildCallTree(events) {
  */
 export function parseExecutionTrace(diagnosticEventsXdr) {
   if (!Array.isArray(diagnosticEventsXdr) || diagnosticEventsXdr.length === 0) {
-    return { callTree: [], flatEvents: [], totalCpuInstructions: null, hasTrap: false };
+    return {
+      callTree: [],
+      flatEvents: [],
+      totalCpuInstructions: null,
+      hasTrap: false,
+    };
   }
 
   const flatEvents = diagnosticEventsXdr
@@ -161,7 +174,8 @@ export function parseExecutionTrace(diagnosticEventsXdr) {
   let hasTrap = false;
   for (const ev of flatEvents) {
     if (ev.cpuInstructions != null) {
-      totalCpuInstructions = (totalCpuInstructions ?? 0) + Number(ev.cpuInstructions);
+      totalCpuInstructions =
+        (totalCpuInstructions ?? 0) + Number(ev.cpuInstructions);
     }
     if (ev.kind === "trap") hasTrap = true;
   }
@@ -183,10 +197,12 @@ export function flattenInvocationTree(invocationNode, depth = 0) {
   const events = [];
   const contractId =
     invocationNode?.function?.contractAddress?.toString?.() ??
-    invocationNode?.contractId ?? null;
+    invocationNode?.contractId ??
+    null;
   const fnName =
     invocationNode?.function?.functionName?.toString?.() ??
-    invocationNode?.functionName ?? "unknown";
+    invocationNode?.functionName ??
+    "unknown";
 
   events.push({
     seq: depth,
