@@ -8,6 +8,32 @@ For background, read the [developer documentation](docs/site/index.html) and the
 
 ## Getting set up
 
+### Option A — GitHub Codespaces / VS Code Dev Container (recommended)
+
+The repo ships a fully configured dev container that provides Rust, Node 20,
+`wasm32-unknown-unknown`, and PostgreSQL with no local installation required.
+
+1. Open the repo in GitHub Codespaces **or** VS Code with the
+   [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+   extension and choose **Reopen in Container**.
+2. The `postCreateCommand` automatically installs all dependencies and fetches
+   Cargo crates. Wait for it to finish (visible in the terminal panel).
+3. Copy `.env.example` to `.env` if it wasn't copied automatically:
+   ```bash
+   cp .env.example .env
+   ```
+4. Start the full stack:
+   ```bash
+   make dev
+   ```
+   Frontend: http://localhost:5173 · API: http://localhost:3001
+
+> If you see **"running in recovery mode"**, run **Rebuild Container** from the
+> VS Code command palette. This rebuilds the image with Rust + Node 20 from
+> `.devcontainer/Dockerfile`.
+
+### Option B — Local setup
+
 1. Fork the repository and clone your fork.
 2. Follow [Getting started](docs/guides/getting-started.md) to run the stack.
 3. Install dependencies for the package you are changing
