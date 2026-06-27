@@ -133,7 +133,7 @@ const writeLimiter = rateLimit({
   message: { error: "Too many requests" },
 });
 
-export function startApi() {
+export function createApi({ logDestination, dbOverride } = {}) {
   const app = express();
   app.use(helmet());
   const isWildcard = process.env.CORS_ORIGINS === '*';
@@ -170,6 +170,9 @@ export function startApi() {
   app.use("/api/billing", stripeWebhookRouter);
 
   app.use(express.json());
+  app.use(requestIdMiddleware);
+  app.use(createHttpLogger(logDestination));
+  app.use(metricsMiddleware);
 
   // ── Auth & Rate Limiting Middleware Stack ─────────────────────────────────
   // Order matters: audit logger sets _startTime first, then auth resolves tier,
@@ -329,7 +332,7 @@ export function startApi() {
   // Returns the ZK host function call list and cost delta for a single event.
   app.get("/api/events/:seq/zk-costs", async (req, res) => {
     try {
-      const ev = await db.getEvent(Number(req.params.seq));
+      const ev = await data.getEvent(Number(req.params.seq));
       if (!ev) return res.status(404).json({ error: "Not found" });
       if (!ev.zk_host_calls) return res.json({ calls: [], delta: null });
       const zk = typeof ev.zk_host_calls === "string" ? JSON.parse(ev.zk_host_calls) : ev.zk_host_calls;
@@ -750,10 +753,9 @@ export function startApi() {
     }
   });
 
-  // GET /api/wallet/:address
   app.get("/api/wallet/:address", async (req, res) => {
     try {
-      const events = await db.getWalletEvents(req.params.address);
+      const events = await data.getWalletEvents(req.params.address);
       res.json(events);
     } catch (e) {
       res.status(500).json({ error: e.message });
