@@ -645,16 +645,15 @@ impl ExplorerContract {
             .get(&DataKey::MaxEvents)
             .unwrap_or(DEFAULT_MAX_EVENTS);
         let slot = seq % (max as u64);
-        let stored: DecodedEvent = env
-            .storage()
-            .persistent()
-            .get(&DataKey::EventLog(slot))
-            .unwrap_or_else(|| panic_with_error!(&env, Error::NotFound));
+        let stored: DecodedEvent = match env.storage().persistent().get(&DataKey::EventLog(slot)) {
+            Some(ev) => ev,
+            None => return Err(Error::NotFound),
+        };
         // Verify the slot still holds the requested seq (not overwritten)
         if stored.seq != seq {
-            panic_with_error!(&env, Error::NotFound);
+            return Err(Error::NotFound);
         }
-        stored
+        Ok(stored)
     }
 
     /// Returns the total number of stored events, capped by the configured maximum.
